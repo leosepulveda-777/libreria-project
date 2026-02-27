@@ -11,4 +11,5 @@ public interface AuthService {
 
     // US-002: Login con email y password
     AuthResponseDTO login(LoginRequestDTO request);
+    AuthResponseDTO refreshToken(String refreshToken);
 }

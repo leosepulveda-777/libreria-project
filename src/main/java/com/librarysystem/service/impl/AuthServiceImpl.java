@@ -1,6 +1,7 @@
 package com.librarysystem.service.impl;
 
 import com.librarysystem.dto.AuthResponseDTO;
+import com.librarysystem.dto.LoginRequestDTO;
 import com.librarysystem.dto.RegisterRequestDTO;
 import com.librarysystem.entity.Role;
 import com.librarysystem.entity.RoleEnum;
@@ -10,10 +11,9 @@ import com.librarysystem.repository.UserRepository;
 import com.librarysystem.service.AuthService;
 import com.librarysystem.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import com.librarysystem.dto.LoginRequestDTO;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.UUID;
@@ -27,28 +27,23 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
 
+    // ─── US-001 ───────────────────────────────────────────────────────────────
+
     @Override
     public AuthResponseDTO register(RegisterRequestDTO request) {
 
-        // 1. Verificar que el email no esté registrado
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new RuntimeException("El email ya está registrado");
         }
-
-        // 2. Verificar que el documento no esté registrado
         if (userRepository.existsByDocument(request.getDocumento())) {
             throw new RuntimeException("El documento ya está registrado");
         }
 
-        // 3. Buscar el rol LECTOR en la BD
         Role rolLector = roleRepository.findByName(RoleEnum.LECTOR)
-                .orElseThrow(() -> new RuntimeException("Rol LECTOR no encontrado. Verifica que esté en la BD"));
+                .orElseThrow(() -> new RuntimeException("Rol LECTOR no encontrado en la BD"));
 
-        // 4. Generar número de carnet único
-        // Tomamos los primeros 8 caracteres de un UUID sin guiones
         String numeroCarnet = "LIB-" + UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
 
-        // 5. Construir el usuario
         User user = User.builder()
                 .firstName(request.getNombre())
                 .lastName(request.getApellido())
@@ -57,37 +52,21 @@ public class AuthServiceImpl implements AuthService {
                 .phone(request.getTelefono())
                 .address(request.getDireccion())
                 .birthDate(request.getFechaNacimiento())
-                // Encriptamos el password con BCrypt antes de guardar
                 .password(passwordEncoder.encode(request.getPassword()))
                 .cardNumber(numeroCarnet)
                 .active(true)
                 .role(rolLector)
                 .build();
 
-        // 6. Generar tokens
-        String accessToken = jwtUtil.generateAccessToken(
-                user.getEmail(),
-                RoleEnum.LECTOR.name(),
-                null, // aún no tiene id porque no se ha guardado
-                numeroCarnet
-        );
         String refreshToken = jwtUtil.generateRefreshToken(user.getEmail());
-
-        // 7. Guardar refresh token en el usuario y persistir en BD
         user.setRefreshToken(refreshToken);
         User savedUser = userRepository.save(user);
 
-        // 8. Regenerar access token con el id real asignado por la BD
-        String finalAccessToken = jwtUtil.generateAccessToken(
-                savedUser.getEmail(),
-                RoleEnum.LECTOR.name(),
-                savedUser.getId(),
-                numeroCarnet
-        );
+        String accessToken = jwtUtil.generateAccessToken(
+                savedUser.getEmail(), RoleEnum.LECTOR.name(), savedUser.getId(), numeroCarnet);
 
-        // 9. Retornar respuesta con tokens e info del usuario
         return AuthResponseDTO.builder()
-                .accessToken(finalAccessToken)
+                .accessToken(accessToken)
                 .refreshToken(refreshToken)
                 .userId(savedUser.getId())
                 .email(savedUser.getEmail())
@@ -96,44 +75,70 @@ public class AuthServiceImpl implements AuthService {
                 .build();
     }
 
-
-    //  US-002: Login
+    // ─── US-002 ───────────────────────────────────────────────────────────────
 
     @Override
     public AuthResponseDTO login(LoginRequestDTO request) {
 
-        // 1. Buscar usuario por email
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.UNAUTHORIZED, "Credenciales inválidas"));
 
-        // 2. Verificar que el usuario esté activo
         if (!user.getActive()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Usuario inactivo");
         }
-
-        // 3. Verificar password
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Credenciales inválidas");
         }
 
-        // 4. Obtener rol
         String rol = user.getRole().getName().name();
-
-        // 5. numeroCarnet solo si es LECTOR
         String numeroCarnet = rol.equals(RoleEnum.LECTOR.name()) ? user.getCardNumber() : null;
 
-        // 6. Generar tokens
         String accessToken  = jwtUtil.generateAccessToken(user.getEmail(), rol, user.getId(), numeroCarnet);
         String refreshToken = jwtUtil.generateRefreshToken(user.getEmail());
 
-        // 7. Actualizar refresh token en BD
         user.setRefreshToken(refreshToken);
         userRepository.save(user);
 
-        // 8. Retornar respuesta
         return AuthResponseDTO.builder()
                 .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .userId(user.getId())
+                .email(user.getEmail())
+                .rol(rol)
+                .numeroCarnet(numeroCarnet)
+                .build();
+    }
+
+    // ─── US-003 ───────────────────────────────────────────────────────────────
+
+    @Override
+    public AuthResponseDTO refreshToken(String refreshToken) {
+
+        if (!jwtUtil.isTokenValid(refreshToken)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token inválido o expirado");
+        }
+
+        String email = jwtUtil.extractEmail(refreshToken);
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.UNAUTHORIZED, "Usuario no encontrado"));
+
+        if (!refreshToken.equals(user.getRefreshToken())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token inválido");
+        }
+        if (!user.getActive()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Usuario inactivo");
+        }
+
+        String rol = user.getRole().getName().name();
+        String numeroCarnet = rol.equals(RoleEnum.LECTOR.name()) ? user.getCardNumber() : null;
+
+        String newAccessToken = jwtUtil.generateAccessToken(user.getEmail(), rol, user.getId(), numeroCarnet);
+
+        return AuthResponseDTO.builder()
+                .accessToken(newAccessToken)
                 .refreshToken(refreshToken)
                 .userId(user.getId())
                 .email(user.getEmail())
