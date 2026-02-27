@@ -12,6 +12,9 @@ import com.librarysystem.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import com.librarysystem.dto.LoginRequestDTO;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.UUID;
 
@@ -89,6 +92,52 @@ public class AuthServiceImpl implements AuthService {
                 .userId(savedUser.getId())
                 .email(savedUser.getEmail())
                 .rol(RoleEnum.LECTOR.name())
+                .numeroCarnet(numeroCarnet)
+                .build();
+    }
+
+
+    //  US-002: Login
+
+    @Override
+    public AuthResponseDTO login(LoginRequestDTO request) {
+
+        // 1. Buscar usuario por email
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.UNAUTHORIZED, "Credenciales inválidas"));
+
+        // 2. Verificar que el usuario esté activo
+        if (!user.getActive()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Usuario inactivo");
+        }
+
+        // 3. Verificar password
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Credenciales inválidas");
+        }
+
+        // 4. Obtener rol
+        String rol = user.getRole().getName().name();
+
+        // 5. numeroCarnet solo si es LECTOR
+        String numeroCarnet = rol.equals(RoleEnum.LECTOR.name()) ? user.getCardNumber() : null;
+
+        // 6. Generar tokens
+        String accessToken  = jwtUtil.generateAccessToken(user.getEmail(), rol, user.getId(), numeroCarnet);
+        String refreshToken = jwtUtil.generateRefreshToken(user.getEmail());
+
+        // 7. Actualizar refresh token en BD
+        user.setRefreshToken(refreshToken);
+        userRepository.save(user);
+
+        // 8. Retornar respuesta
+        return AuthResponseDTO.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .userId(user.getId())
+                .email(user.getEmail())
+                .rol(rol)
                 .numeroCarnet(numeroCarnet)
                 .build();
     }
