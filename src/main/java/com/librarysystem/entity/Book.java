@@ -24,11 +24,16 @@ public class Book {
     @Column(nullable = false, unique = true)
     private String isbn;
 
+    private String publisher;
+
     @Column(name = "publication_year")
     private Integer publicationYear;
 
     @Column(length = 1000)
     private String synopsis;
+
+    @Column(name = "image_url")
+    private String imageUrl;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -40,9 +45,9 @@ public class Book {
 
     @ManyToMany
     @JoinTable(
-        name = "book_authors",
-        joinColumns = @JoinColumn(name = "book_id"),
-        inverseJoinColumns = @JoinColumn(name = "author_id")
+            name = "book_authors",
+            joinColumns = @JoinColumn(name = "book_id"),
+            inverseJoinColumns = @JoinColumn(name = "author_id")
     )
     private List<Author> authors;
 

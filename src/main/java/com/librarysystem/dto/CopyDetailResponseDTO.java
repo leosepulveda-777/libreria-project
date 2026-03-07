@@ -15,6 +15,8 @@ import java.time.LocalDateTime;
 public class CopyDetailResponseDTO {
     private Long id;
     private String copyNumber;
+    private String barcode;
+    private String location;
     private EstadoEjemplar status;
     private LocalDateTime acquisitionDate;
     private String notes;

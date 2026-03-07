@@ -19,6 +19,8 @@ public class BookRequestDTO {
     @NotBlank(message = "El ISBN es obligatorio")
     private String isbn;
 
+    private String publisher;
+
     @NotNull(message = "El año de publicación es obligatorio")
     @Min(value = 1000, message = "El año no es válido")
     @Max(value = 2100, message = "El año no es válido")
@@ -26,6 +28,8 @@ public class BookRequestDTO {
 
     @Size(max = 1000, message = "La sinopsis no puede superar los 1000 caracteres")
     private String synopsis;
+
+    private String imageUrl;
 
     @NotNull(message = "El tipo de libro es obligatorio")
     private TipoLibro tipo;

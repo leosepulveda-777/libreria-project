@@ -16,8 +16,10 @@ public class BookDetailResponseDTO {
     private Long id;
     private String title;
     private String isbn;
+    private String publisher;
     private Integer publicationYear;
     private String synopsis;
+    private String imageUrl;
     private TipoLibro tipo;
     private CategoryResponseDTO category;
     private List<AuthorResponse> authors;

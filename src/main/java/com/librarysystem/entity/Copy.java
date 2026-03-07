@@ -25,6 +25,12 @@ public class Copy {
     @Column(name = "copy_number", nullable = false)
     private String copyNumber;
 
+    @Column(name = "barcode", unique = true)
+    private String barcode;
+
+    @Column(name = "location")
+    private String location;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private EstadoEjemplar status;

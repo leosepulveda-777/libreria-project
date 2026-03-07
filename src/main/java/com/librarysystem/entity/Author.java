@@ -3,6 +3,7 @@ package com.librarysystem.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Entity
@@ -22,10 +23,16 @@ public class Author {
     private String name;
 
     @Column(nullable = false)
+    private String lastName;
+
+    @Column(nullable = false)
     private String nationality;
 
-    @Column(name = "birth_year")
-    private Integer birthYear;
+    @Column(name = "birth_date")
+    private LocalDate birthDate;
+
+    @Column(name = "death_date")
+    private LocalDate deathDate;
 
     @Column(length = 1000)
     private String biography;

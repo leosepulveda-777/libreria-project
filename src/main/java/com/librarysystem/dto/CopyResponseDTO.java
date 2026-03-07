@@ -17,6 +17,8 @@ public class CopyResponseDTO {
     private Long bookId;
     private String bookTitle;
     private String copyNumber;
+    private String barcode;
+    private String location;
     private EstadoEjemplar status;
     private LocalDateTime acquisitionDate;
     private String notes;
