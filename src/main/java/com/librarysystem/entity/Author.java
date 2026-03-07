@@ -2,7 +2,6 @@ package com.librarysystem.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-
 import java.time.LocalDate;
 
 @Entity
@@ -14,18 +13,22 @@ public class Author {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // US-005: Create author (First name, Last name)
     @Column(nullable = false)
-    private String nombre;
+    private String firstName;
 
-    private String apellido;
-    private String nacionalidad;
+    @Column(nullable = false)
+    private String lastName;
 
-    private LocalDate fechaNacimiento;
-    private LocalDate fechaFallecimiento;
+    // US-005: Nationality and dates
+    private String nationality;
+    private LocalDate birthDate;
+    private LocalDate deathDate;
 
+    // US-005: Biography (long text)
     @Column(columnDefinition = "TEXT")
-    private String biografia;
+    private String biography;
 
     @Column(nullable = false)
-    private Boolean activo = true;
+    private Boolean active = true;
 }
