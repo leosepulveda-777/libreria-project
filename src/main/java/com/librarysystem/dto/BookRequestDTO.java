@@ -1,10 +1,8 @@
 package com.librarysystem.dto;
 
-import com.librarysystem.entity.TipoLibro;
 import jakarta.validation.constraints.*;
-import lombok.*;
 
-import java.util.List;
+import lombok.*;
 
 @Getter
 @Setter
@@ -20,23 +18,10 @@ public class BookRequestDTO {
     private String isbn;
 
     @NotNull(message = "El año de publicación es obligatorio")
-    @Min(1000)
-    @Max(2100)
+    @Min(value = 1000, message = "El año no es válido")
+    @Max(value = 2100, message = "El año no es válido")
     private Integer publicationYear;
 
-    @Size(max = 1000)
+    @Size(max = 1000, message = "La sinopsis no puede superar los 1000 caracteres")
     private String synopsis;
-
-    // NUEVOS
-    private String editorial;
-
-    private String imageUrl;
-
-    @NotNull
-    private TipoLibro tipo;
-
-    // RELACIONES
-    private List<Long> authorIds;
-
-    private Long categoryId;
 }
