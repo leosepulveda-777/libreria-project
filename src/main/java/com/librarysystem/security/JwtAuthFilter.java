@@ -11,7 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -25,41 +24,38 @@ import java.io.IOException;
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
-    private final UserDetailsService userDetailsService;
     private final UserRepository userRepository;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-
         try {
             String jwt = getJwtFromRequest(request);
 
-            if (StringUtils.hasText(jwt) && jwtUtil.validateToken(jwt, jwtUtil.getUsernameFromToken(jwt))) {
+            if (StringUtils.hasText(jwt) && jwtUtil.isTokenValid(jwt)) {
                 String email = jwtUtil.getUsernameFromToken(jwt);
 
-                // Verificar que el usuario existe y está activo
-                var userOptional = userRepository.findByEmail(email);
-                if (userOptional.isPresent() && userOptional.get().getActive()) {
-                    var user = userOptional.get();
+                userRepository.findByEmail(email).ifPresent(user -> {
+                    if (Boolean.TRUE.equals(user.getActive())) {
+                        UserDetails userDetails = org.springframework.security.core.userdetails.User
+                                .builder()
+                                .username(user.getEmail())
+                                .password(user.getPassword())
+                                .roles(user.getRole().getName())
+                                .build();
 
-                    // Crear UserDetails básico
-                    UserDetails userDetails = org.springframework.security.core.userdetails.User.builder()
-                            .username(user.getEmail())
-                            .password(user.getPassword())
-                            .roles(user.getRole().getName())
-                            .build();
-
-                    UsernamePasswordAuthenticationToken authentication =
-                            new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
-                }
+                        UsernamePasswordAuthenticationToken authentication =
+                                new UsernamePasswordAuthenticationToken(
+                                        userDetails, null, userDetails.getAuthorities());
+                        authentication.setDetails(
+                                new WebAuthenticationDetailsSource().buildDetails(request));
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
+                    }
+                });
             }
         } catch (Exception ex) {
-            log.error("No se pudo establecer la autenticación del usuario: {}", ex.getMessage());
+            log.error("No se pudo establecer la autenticación: {}", ex.getMessage());
         }
 
         filterChain.doFilter(request, response);

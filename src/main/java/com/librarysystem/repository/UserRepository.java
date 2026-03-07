@@ -2,9 +2,11 @@ package com.librarysystem.repository;
 
 import com.librarysystem.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 
+@Repository
 public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByEmail(String email);
@@ -12,6 +14,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByDocument(String document);
 
     Optional<User> findByCardNumber(String cardNumber);
+
+    Optional<User> findByRefreshToken(String refreshToken);
 
     boolean existsByEmail(String email);
 

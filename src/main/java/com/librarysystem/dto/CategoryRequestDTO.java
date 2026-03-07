@@ -1,16 +1,18 @@
 package com.librarysystem.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import jakarta.validation.constraints.NotBlank;
+import lombok.*;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class CategoryRequestDTO {
-    private String name;
-    private String description;
-    private Long parentCategoryId;
+
+    @NotBlank(message = "El nombre es obligatorio")
+    private String nombre;
+
+    private String descripcion;
+
+    private Long categoriaPadreId;
 }

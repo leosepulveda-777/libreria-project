@@ -38,14 +38,12 @@ public class BookServiceImpl implements BookService {
                 .active(true)
                 .build();
 
-        // Asignar categoría si se proporciona
         if (dto.getCategoryId() != null) {
             Category category = categoryRepository.findById(dto.getCategoryId())
                     .orElseThrow(() -> new ResourceNotFoundException("Categoría no encontrada"));
             book.setCategory(category);
         }
 
-        // Asignar autores
         if (dto.getAuthorIds() != null && !dto.getAuthorIds().isEmpty()) {
             List<Author> authors = authorRepository.findAllById(dto.getAuthorIds());
             if (authors.size() != dto.getAuthorIds().size()) {
@@ -85,7 +83,6 @@ public class BookServiceImpl implements BookService {
         book.setSynopsis(dto.getSynopsis());
         book.setTipo(dto.getTipo());
 
-        // Actualizar categoría
         if (dto.getCategoryId() != null) {
             Category category = categoryRepository.findById(dto.getCategoryId())
                     .orElseThrow(() -> new ResourceNotFoundException("Categoría no encontrada"));
@@ -94,7 +91,6 @@ public class BookServiceImpl implements BookService {
             book.setCategory(null);
         }
 
-        // Actualizar autores
         if (dto.getAuthorIds() != null && !dto.getAuthorIds().isEmpty()) {
             List<Author> authors = authorRepository.findAllById(dto.getAuthorIds());
             if (authors.size() != dto.getAuthorIds().size()) {
@@ -171,21 +167,21 @@ public class BookServiceImpl implements BookService {
                 .tipo(book.getTipo())
                 .category(book.getCategory() != null ? mapCategoryToResponse(book.getCategory()) : null)
                 .authors(book.getAuthors() != null ?
-                    book.getAuthors().stream()
-                        .map(this::mapAuthorToResponse)
-                        .collect(Collectors.toList()) : null)
+                        book.getAuthors().stream()
+                                .map(this::mapAuthorToResponse)
+                                .collect(Collectors.toList()) : null)
                 .ejemplares(book.getCopies() != null ?
-                    book.getCopies().stream()
-                        .filter(Copy::getActive)
-                        .map(this::mapCopyToDetailResponse)
-                        .collect(Collectors.toList()) : null)
+                        book.getCopies().stream()
+                                .filter(Copy::getActive)
+                                .map(this::mapCopyToDetailResponse)
+                                .collect(Collectors.toList()) : null)
                 .formatosDigitales(book.getDigitalFormats() != null ?
-                    book.getDigitalFormats().stream()
-                        .filter(DigitalFormat::getActivo)
-                        .map(this::mapDigitalFormatToResponse)
-                        .collect(Collectors.toList()) : null)
-                .usuarioTienePrestado(false) // TODO: Implementar lógica de préstamos
-                .usuarioTieneReservado(false) // TODO: Implementar lógica de reservas
+                        book.getDigitalFormats().stream()
+                                .filter(DigitalFormat::getActivo)
+                                .map(this::mapDigitalFormatToResponse)
+                                .collect(Collectors.toList()) : null)
+                .usuarioTienePrestado(false)
+                .usuarioTieneReservado(false)
                 .active(book.getActive())
                 .build();
     }
@@ -238,8 +234,8 @@ public class BookServiceImpl implements BookService {
 
     private BookResponseDTO mapToResponse(Book book) {
         long totalCopies = copyRepository.countByBookIdAndStatusAndActiveTrue(book.getId(), EstadoEjemplar.DISPONIBLE) +
-                          copyRepository.countByBookIdAndStatusAndActiveTrue(book.getId(), EstadoEjemplar.PRESTADO) +
-                          copyRepository.countByBookIdAndStatusAndActiveTrue(book.getId(), EstadoEjemplar.RESERVADO);
+                copyRepository.countByBookIdAndStatusAndActiveTrue(book.getId(), EstadoEjemplar.PRESTADO) +
+                copyRepository.countByBookIdAndStatusAndActiveTrue(book.getId(), EstadoEjemplar.RESERVADO);
 
         long availableCopies = copyRepository.countByBookIdAndStatusAndActiveTrue(book.getId(), EstadoEjemplar.DISPONIBLE);
 
@@ -252,9 +248,9 @@ public class BookServiceImpl implements BookService {
                 .tipo(book.getTipo())
                 .category(book.getCategory() != null ? book.getCategory().getName() : null)
                 .authors(book.getAuthors() != null ?
-                    book.getAuthors().stream()
-                        .map(Author::getName)
-                        .collect(Collectors.toList()) : null)
+                        book.getAuthors().stream()
+                                .map(Author::getName)
+                                .collect(Collectors.toList()) : null)
                 .ejemplaresTotales((int) totalCopies)
                 .ejemplaresDisponibles((int) availableCopies)
                 .disponible(availableCopies > 0)
@@ -265,9 +261,9 @@ public class BookServiceImpl implements BookService {
     private CategoryResponseDTO mapCategoryToResponse(Category category) {
         return CategoryResponseDTO.builder()
                 .id(category.getId())
-                .name(category.getName())
-                .description(category.getDescription())
-                .active(category.getActive())
+                .nombre(category.getName())
+                .descripcion(category.getDescription())
+                .activa(category.getActive())
                 .build();
     }
 

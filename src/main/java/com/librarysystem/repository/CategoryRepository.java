@@ -12,6 +12,8 @@ import java.util.Optional;
 @Repository
 public interface CategoryRepository extends JpaRepository<Category, Long> {
 
+    boolean existsByName(String name);
+
     Optional<Category> findByNameAndActiveTrue(String name);
 
     List<Category> findByActiveTrue();
@@ -19,6 +21,6 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
     List<Category> findByParentCategoryIsNullAndActiveTrue();
 
     @Query("SELECT c FROM Category c WHERE c.active = true AND " +
-           "LOWER(c.name) LIKE LOWER(CONCAT('%', :keyword, '%'))")
+            "LOWER(c.name) LIKE LOWER(CONCAT('%', :keyword, '%'))")
     List<Category> searchByKeyword(@Param("keyword") String keyword);
 }

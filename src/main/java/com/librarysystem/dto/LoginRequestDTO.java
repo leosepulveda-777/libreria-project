@@ -4,8 +4,6 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 
-
-@Getter  @Setter
 @Data
 @Builder
 @NoArgsConstructor
@@ -17,5 +15,5 @@ public class LoginRequestDTO {
     private String email;
 
     @NotBlank(message = "La contraseña es obligatoria")
-    private String clave;
+    private String password;
 }

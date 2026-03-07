@@ -1,11 +1,13 @@
 package com.librarysystem.dto;
 
-import lombok.Builder;
-import lombok.Data;
+import lombok.*;
+
 import java.util.List;
 
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class CategoryResponseDTO {
 
     private Long id;

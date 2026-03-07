@@ -14,32 +14,19 @@ public class DataInitializer implements CommandLineRunner {
     private final RoleRepository roleRepository;
 
     @Override
-    public void run(String... args) throws Exception {
-        // Crear roles si no existen
-        if (roleRepository.findByName("ADMIN").isEmpty()) {
-            Role adminRole = Role.builder()
-                    .name("ADMIN")
-                    .description("Administrador del sistema")
-                    .build();
-            roleRepository.save(adminRole);
-        }
+    public void run(String... args) {
+        createRoleIfNotExists(RoleEnum.ADMIN.name(), "Administrador del sistema");
+        createRoleIfNotExists(RoleEnum.BIBLIOTECARIO.name(), "Bibliotecario del sistema");
+        createRoleIfNotExists(RoleEnum.LECTOR.name(), "Usuario lector");
+        System.out.println("Roles inicializados correctamente");
+    }
 
-        if (roleRepository.findByName("BIBLIOTECARIO").isEmpty()) {
-            Role bibliotecarioRole = Role.builder()
-                    .name("BIBLIOTECARIO")
-                    .description("Bibliotecario del sistema")
-                    .build();
-            roleRepository.save(bibliotecarioRole);
+    private void createRoleIfNotExists(String name, String description) {
+        if (roleRepository.findByName(name).isEmpty()) {
+            roleRepository.save(Role.builder()
+                    .name(name)
+                    .description(description)
+                    .build());
         }
-
-        if (roleRepository.findByName("LECTOR").isEmpty()) {
-            Role lectorRole = Role.builder()
-                    .name("LECTOR")
-                    .description("Usuario lector")
-                    .build();
-            roleRepository.save(lectorRole);
-        }
-
-        System.out.println("✅ Roles inicializados correctamente");
     }
 }

@@ -1,8 +1,8 @@
 package com.librarysystem.service.impl;
 
 import com.librarysystem.dto.AuthResponseDTO;
-import com.librarysystem.dto.RegisterRequestDTO;
 import com.librarysystem.dto.LoginRequestDTO;
+import com.librarysystem.dto.RegisterRequestDTO;
 import com.librarysystem.entity.Role;
 import com.librarysystem.entity.RoleEnum;
 import com.librarysystem.entity.User;
@@ -38,8 +38,7 @@ public class AuthServiceImpl implements AuthService {
 
         Role rolLector = roleRepository.findByName(RoleEnum.LECTOR.name())
                 .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.INTERNAL_SERVER_ERROR,
-                        "Rol LECTOR no encontrado en la BD"));
+                        HttpStatus.INTERNAL_SERVER_ERROR, "Rol LECTOR no encontrado en la BD"));
 
         String numeroCarnet = "LIB-" + UUID.randomUUID()
                 .toString().replace("-", "").substring(0, 8).toUpperCase();
@@ -79,14 +78,19 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public AuthResponseDTO login(LoginRequestDTO request) {
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Usuario no encontrado"));
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.UNAUTHORIZED, "Credenciales inválidas"));
+
+        if (!Boolean.TRUE.equals(user.getActive())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Usuario inactivo");
+        }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Contraseña incorrecta");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Credenciales inválidas");
         }
 
         String accessToken = jwtUtil.generateAccessToken(
-                user.getEmail(), user.getRole().getName().name(),
+                user.getEmail(), user.getRole().getName(),
                 user.getId(), user.getCardNumber());
 
         String refreshToken = jwtUtil.generateRefreshToken(user.getEmail());
@@ -98,7 +102,7 @@ public class AuthServiceImpl implements AuthService {
                 .refreshToken(refreshToken)
                 .userId(user.getId())
                 .email(user.getEmail())
-                .rol(user.getRole().getName().name())
+                .rol(user.getRole().getName())
                 .numeroCarnet(user.getCardNumber())
                 .build();
     }
@@ -106,18 +110,23 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public AuthResponseDTO refreshToken(String refreshToken) {
         User user = userRepository.findByRefreshToken(refreshToken)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token inválido"));
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.UNAUTHORIZED, "Refresh token inválido o expirado"));
 
-        String accessToken = jwtUtil.generateAccessToken(
-                user.getEmail(), user.getRole().getName().name(),
+        if (!jwtUtil.isTokenValid(refreshToken)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token expirado");
+        }
+
+        String newAccessToken = jwtUtil.generateAccessToken(
+                user.getEmail(), user.getRole().getName(),
                 user.getId(), user.getCardNumber());
 
         return AuthResponseDTO.builder()
-                .accessToken(accessToken)
+                .accessToken(newAccessToken)
                 .refreshToken(user.getRefreshToken())
                 .userId(user.getId())
                 .email(user.getEmail())
-                .rol(user.getRole().getName().name())
+                .rol(user.getRole().getName())
                 .numeroCarnet(user.getCardNumber())
                 .build();
     }
