@@ -1,8 +1,10 @@
 package com.librarysystem.dto;
 
+import com.librarysystem.entity.TipoLibro;
 import jakarta.validation.constraints.*;
-
 import lombok.*;
+
+import java.util.List;
 
 @Getter
 @Setter
@@ -24,4 +26,12 @@ public class BookRequestDTO {
 
     @Size(max = 1000, message = "La sinopsis no puede superar los 1000 caracteres")
     private String synopsis;
+
+    @NotNull(message = "El tipo de libro es obligatorio")
+    private TipoLibro tipo;
+
+    private Long categoryId;
+
+    @NotEmpty(message = "Debe especificar al menos un autor")
+    private List<Long> authorIds;
 }

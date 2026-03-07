@@ -3,6 +3,8 @@ package com.librarysystem.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.List;
+
 @Entity
 @Table(name = "books")
 @Getter
@@ -28,6 +30,29 @@ public class Book {
     @Column(length = 1000)
     private String synopsis;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
+    private TipoLibro tipo;
+
+    @ManyToOne
+    @JoinColumn(name = "category_id")
+    private Category category;
+
+    @ManyToMany
+    @JoinTable(
+        name = "book_authors",
+        joinColumns = @JoinColumn(name = "book_id"),
+        inverseJoinColumns = @JoinColumn(name = "author_id")
+    )
+    private List<Author> authors;
+
+    @OneToMany(mappedBy = "book", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Copy> copies;
+
+    @OneToMany(mappedBy = "book", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<DigitalFormat> digitalFormats;
+
+    @Column(nullable = false)
+    @Builder.Default
     private Boolean active = true;
 }

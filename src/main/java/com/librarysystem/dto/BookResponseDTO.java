@@ -1,6 +1,9 @@
 package com.librarysystem.dto;
 
+import com.librarysystem.entity.TipoLibro;
 import lombok.*;
+
+import java.util.List;
 
 @Getter
 @Setter
@@ -14,5 +17,11 @@ public class BookResponseDTO {
     private String isbn;
     private Integer publicationYear;
     private String synopsis;
+    private TipoLibro tipo;
+    private String category;
+    private List<String> authors;
+    private Integer ejemplaresTotales;
+    private Integer ejemplaresDisponibles;
+    private Boolean disponible;
     private Boolean active;
 }
