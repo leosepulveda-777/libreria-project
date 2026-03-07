@@ -1,25 +1,25 @@
 package com.librarysystem.service.impl;
 
 import com.librarysystem.dto.AuthResponseDTO;
-import com.librarysystem.dto.LoginRequestDTO;
 import com.librarysystem.dto.RegisterRequestDTO;
+import com.librarysystem.dto.LoginRequestDTO;
 import com.librarysystem.entity.Role;
+import com.librarysystem.entity.RoleEnum;
 import com.librarysystem.entity.User;
-import com.librarysystem.exception.ResourceNotFoundException;
 import com.librarysystem.repository.RoleRepository;
 import com.librarysystem.repository.UserRepository;
 import com.librarysystem.service.AuthService;
 import com.librarysystem.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-@Transactional
 public class AuthServiceImpl implements AuthService {
 
     private final UserRepository userRepository;
@@ -29,144 +29,96 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public AuthResponseDTO register(RegisterRequestDTO request) {
-        // Validar que el email no exista
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new IllegalArgumentException("Ya existe un usuario con este email");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "El email ya está registrado");
         }
-
-        // Validar que el documento no exista
         if (userRepository.existsByDocument(request.getDocumento())) {
-            throw new IllegalArgumentException("Ya existe un usuario con este documento");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "El documento ya está registrado");
         }
 
-        // Obtener rol LECTOR
-        Role lectorRole = roleRepository.findByName("LECTOR")
-                .orElseThrow(() -> new ResourceNotFoundException("Rol LECTOR no encontrado"));
+        Role rolLector = roleRepository.findByName(RoleEnum.LECTOR.name())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.INTERNAL_SERVER_ERROR,
+                        "Rol LECTOR no encontrado en la BD"));
 
-        // Generar número de carnet único
-        String cardNumber;
-        do {
-            cardNumber = "LIB-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
-        } while (userRepository.findByCardNumber(cardNumber).isPresent());
+        String numeroCarnet = "LIB-" + UUID.randomUUID()
+                .toString().replace("-", "").substring(0, 8).toUpperCase();
 
-        // Crear usuario
         User user = User.builder()
-                .firstName(request.getNombre().split(" ")[0])
-                .lastName(request.getNombre().contains(" ") ?
-                    request.getNombre().substring(request.getNombre().indexOf(" ") + 1) :
-                    "")
+                .firstName(request.getNombre())
+                .lastName(request.getApellido())
                 .document(request.getDocumento())
                 .email(request.getEmail())
-                .password(passwordEncoder.encode(request.getClave()))
-                .cardNumber(cardNumber)
+                .phone(request.getTelefono())
+                .address(request.getDireccion())
+                .birthDate(request.getFechaNacimiento())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .cardNumber(numeroCarnet)
                 .active(true)
-                .role(lectorRole)
+                .role(rolLector)
                 .build();
 
+        String refreshToken = jwtUtil.generateRefreshToken(user.getEmail());
+        user.setRefreshToken(refreshToken);
         User savedUser = userRepository.save(user);
 
-        // Generar tokens
-        String accessToken = jwtUtil.generateToken(
-            savedUser.getEmail(),
-            savedUser.getRole().getName(),
-            savedUser.getId(),
-            savedUser.getCardNumber()
-        );
-
-        String refreshToken = jwtUtil.generateRefreshToken(savedUser.getEmail());
+        String accessToken = jwtUtil.generateAccessToken(
+                savedUser.getEmail(), RoleEnum.LECTOR.name(),
+                savedUser.getId(), numeroCarnet);
 
         return AuthResponseDTO.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
-                .tokenType("Bearer")
                 .userId(savedUser.getId())
-                .rol(savedUser.getRole().getName())
-                .numeroCarnet(savedUser.getCardNumber())
-                .nombre(savedUser.getFirstName() + " " + savedUser.getLastName())
                 .email(savedUser.getEmail())
+                .rol(RoleEnum.LECTOR.name())
+                .numeroCarnet(numeroCarnet)
                 .build();
     }
 
     @Override
     public AuthResponseDTO login(LoginRequestDTO request) {
-        // Buscar usuario por email
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new IllegalArgumentException("Credenciales inválidas"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Usuario no encontrado"));
 
-        // Verificar contraseña
-        if (!passwordEncoder.matches(request.getClave(), user.getPassword())) {
-            throw new IllegalArgumentException("Credenciales inválidas");
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Contraseña incorrecta");
         }
 
-        // Verificar que el usuario esté activo
-        if (!user.getActive()) {
-            throw new IllegalArgumentException("Usuario inactivo");
-        }
-
-        // Generar tokens
-        String accessToken = jwtUtil.generateToken(
-            user.getEmail(),
-            user.getRole().getName(),
-            user.getId(),
-            user.getCardNumber()
-        );
+        String accessToken = jwtUtil.generateAccessToken(
+                user.getEmail(), user.getRole().getName().name(),
+                user.getId(), user.getCardNumber());
 
         String refreshToken = jwtUtil.generateRefreshToken(user.getEmail());
+        user.setRefreshToken(refreshToken);
+        userRepository.save(user);
 
         return AuthResponseDTO.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
-                .tokenType("Bearer")
                 .userId(user.getId())
-                .rol(user.getRole().getName())
-                .numeroCarnet(user.getCardNumber())
-                .nombre(user.getFirstName() + " " + user.getLastName())
                 .email(user.getEmail())
+                .rol(user.getRole().getName().name())
+                .numeroCarnet(user.getCardNumber())
                 .build();
     }
 
     @Override
     public AuthResponseDTO refreshToken(String refreshToken) {
-        try {
-            // Validar refresh token
-            if (jwtUtil.isTokenExpired(refreshToken)) {
-                throw new IllegalArgumentException("Refresh token expirado");
-            }
+        User user = userRepository.findByRefreshToken(refreshToken)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token inválido"));
 
-            String email = jwtUtil.getUsernameFromToken(refreshToken);
+        String accessToken = jwtUtil.generateAccessToken(
+                user.getEmail(), user.getRole().getName().name(),
+                user.getId(), user.getCardNumber());
 
-            // Buscar usuario
-            User user = userRepository.findByEmail(email)
-                    .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
-
-            // Verificar que el usuario esté activo
-            if (!user.getActive()) {
-                throw new IllegalArgumentException("Usuario inactivo");
-            }
-
-            // Generar nuevos tokens
-            String newAccessToken = jwtUtil.generateToken(
-                user.getEmail(),
-                user.getRole().getName(),
-                user.getId(),
-                user.getCardNumber()
-            );
-
-            String newRefreshToken = jwtUtil.generateRefreshToken(user.getEmail());
-
-            return AuthResponseDTO.builder()
-                    .accessToken(newAccessToken)
-                    .refreshToken(newRefreshToken)
-                    .tokenType("Bearer")
-                    .userId(user.getId())
-                    .rol(user.getRole().getName())
-                    .numeroCarnet(user.getCardNumber())
-                    .nombre(user.getFirstName() + " " + user.getLastName())
-                    .email(user.getEmail())
-                    .build();
-
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Refresh token inválido");
-        }
+        return AuthResponseDTO.builder()
+                .accessToken(accessToken)
+                .refreshToken(user.getRefreshToken())
+                .userId(user.getId())
+                .email(user.getEmail())
+                .rol(user.getRole().getName().name())
+                .numeroCarnet(user.getCardNumber())
+                .build();
     }
 }

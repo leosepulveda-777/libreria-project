@@ -6,7 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import java.security.Key;
+import javax.crypto.SecretKey;
 import java.util.Date;
 import java.util.function.Function;
 
@@ -23,81 +23,82 @@ public class JwtUtil {
     @Value("${jwt.refresh-expiration}")
     private long jwtRefreshExpirationInMs;
 
-    private Key getSigningKey() {
+    private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(jwtSecret.getBytes());
     }
 
-    public String generateToken(String subject, String role, Long userId, String cardNumber) {
-        Date now = new Date();
-        Date expiryDate = new Date(now.getTime() + jwtExpirationInMs);
+    // Método que llama el código existente
+    public String generateAccessToken(String subject, String role, Long userId, String cardNumber) {
+        return generateToken(subject, role, userId, cardNumber);
+    }
 
+    public String generateToken(String subject, String role, Long userId, String cardNumber) {
         return Jwts.builder()
-                .setSubject(subject)
+                .subject(subject)
                 .claim("role", role)
                 .claim("userId", userId)
                 .claim("cardNumber", cardNumber)
-                .setIssuedAt(now)
-                .setExpiration(expiryDate)
-                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + jwtExpirationInMs))
+                .signWith(getSigningKey())
                 .compact();
     }
 
     public String generateRefreshToken(String subject) {
-        Date now = new Date();
-        Date expiryDate = new Date(now.getTime() + jwtRefreshExpirationInMs);
-
         return Jwts.builder()
-                .setSubject(subject)
-                .setIssuedAt(now)
-                .setExpiration(expiryDate)
-                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .subject(subject)
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + jwtRefreshExpirationInMs))
+                .signWith(getSigningKey())
                 .compact();
     }
 
     public String getUsernameFromToken(String token) {
-        return getClaimFromToken(token, Claims::getSubject);
+        return extractEmail(token);
+    }
+
+    public String extractEmail(String token) {
+        return getClaim(token, Claims::getSubject);
     }
 
     public String getRoleFromToken(String token) {
-        return getClaimFromToken(token, claims -> claims.get("role", String.class));
+        return getClaim(token, c -> c.get("role", String.class));
     }
 
     public Long getUserIdFromToken(String token) {
-        return getClaimFromToken(token, claims -> claims.get("userId", Long.class));
+        return getClaim(token, c -> c.get("userId", Long.class));
     }
 
     public String getCardNumberFromToken(String token) {
-        return getClaimFromToken(token, claims -> claims.get("cardNumber", String.class));
+        return getClaim(token, c -> c.get("cardNumber", String.class));
     }
 
-    public Date getExpirationDateFromToken(String token) {
-        return getClaimFromToken(token, Claims::getExpiration);
+    public <T> T getClaim(String token, Function<Claims, T> resolver) {
+        return resolver.apply(parseToken(token));
     }
 
-    public <T> T getClaimFromToken(String token, Function<Claims, T> claimsResolver) {
-        final Claims claims = getAllClaimsFromToken(token);
-        return claimsResolver.apply(claims);
-    }
-
-    private Claims getAllClaimsFromToken(String token) {
-        return Jwts.parserBuilder()
-                .setSigningKey(getSigningKey())
+    private Claims parseToken(String token) {
+        return Jwts.parser()
+                .verifyWith(getSigningKey())
                 .build()
-                .parseClaimsJws(token)
-                .getBody();
+                .parseSignedClaims(token)
+                .getPayload();
     }
 
-    public Boolean isTokenExpired(String token) {
-        final Date expiration = getExpirationDateFromToken(token);
-        return expiration.before(new Date());
+    public boolean isTokenValid(String token) {
+        try {
+            parseToken(token);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     public Boolean validateToken(String token, String username) {
         try {
-            final String tokenUsername = getUsernameFromToken(token);
-            return (username.equals(tokenUsername) && !isTokenExpired(token));
+            return username.equals(extractEmail(token)) && isTokenValid(token);
         } catch (Exception e) {
-            log.error("Error validating token: {}", e.getMessage());
+            log.error("Error validando token: {}", e.getMessage());
             return false;
         }
     }

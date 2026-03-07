@@ -31,11 +31,9 @@ public interface BookRepository extends JpaRepository<Book, Long> {
            "LOWER(a.name) LIKE LOWER(CONCAT('%', :autor, '%'))")
     List<Book> searchByAuthor(@Param("autor") String autor);
 
-    @Query("SELECT b FROM Book b WHERE b.active = true AND b.category.id = :categoryId")
-    List<Book> findByCategoryIdAndActiveTrue(@Param("categoryId") Long categoryId);
 
-    @Query("SELECT b FROM Book b WHERE b.active = true AND b.tipo = :tipo")
-    List<Book> findByTipoAndActiveTrue(@Param("tipo") TipoLibro tipo);
+
+
 
     @Query("SELECT b FROM Book b WHERE b.active = true AND " +
            "(:keyword IS NULL OR LOWER(b.title) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +

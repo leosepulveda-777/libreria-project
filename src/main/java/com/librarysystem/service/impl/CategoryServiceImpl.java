@@ -22,56 +22,52 @@ public class CategoryServiceImpl implements CategoryService {
 
     @Override
     public CategoryResponseDTO createCategory(CategoryRequestDTO request) {
-        if (categoryRepository.findByNameAndActiveTrue(request.getName()).isPresent()) {
+        if (categoryRepository.existsByNombre(request.getNombre())) {
             throw new IllegalArgumentException("Ya existe una categoría con ese nombre");
         }
 
         Category category = Category.builder()
-                .name(request.getName())
-                .description(request.getDescription())
-                .active(true)
+                .nombre(request.getNombre())
+                .descripcion(request.getDescripcion())
+                .activa(true)
                 .build();
 
-        if (request.getParentCategoryId() != null) {
-            Category parentCategory = categoryRepository.findById(request.getParentCategoryId())
+        if (request.getCategoriaPadreId() != null) {
+            Category padre = categoryRepository.findById(request.getCategoriaPadreId())
                     .orElseThrow(() -> new ResourceNotFoundException("Categoría padre no encontrada"));
-            category.setParentCategory(parentCategory);
+            category.setCategoriaPadre(padre);
         }
 
-        Category savedCategory = categoryRepository.save(category);
-        return mapToResponse(savedCategory);
+        return toDTO(categoryRepository.save(category));
     }
 
     @Override
     @Transactional(readOnly = true)
     public CategoryResponseDTO getCategoryById(Long id) {
-        Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Categoría no encontrada"));
-        return mapToResponse(category);
+        return toDTO(categoryRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Categoría no encontrada")));
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<CategoryResponseDTO> getAllCategories() {
-        return categoryRepository.findByActiveTrue().stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
+        return categoryRepository.findByActivaTrue().stream()
+                .map(this::toDTO).collect(Collectors.toList());
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<CategoryResponseDTO> getRootCategories() {
-        return categoryRepository.findByParentCategoryIsNullAndActiveTrue().stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
+        return categoryRepository.findByCategoriaPadreIsNullAndActivaTrue().stream()
+                .map(this::toDTO).collect(Collectors.toList());
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<CategoryResponseDTO> searchCategories(String keyword) {
-        return categoryRepository.searchByKeyword(keyword).stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
+        return categoryRepository.findByActivaTrue().stream()
+                .filter(c -> c.getNombre().toLowerCase().contains(keyword.toLowerCase()))
+                .map(this::toDTO).collect(Collectors.toList());
     }
 
     @Override
@@ -79,41 +75,47 @@ public class CategoryServiceImpl implements CategoryService {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Categoría no encontrada"));
 
-        category.setName(request.getName());
-        category.setDescription(request.getDescription());
-
-        if (request.getParentCategoryId() != null) {
-            Category parentCategory = categoryRepository.findById(request.getParentCategoryId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Categoría padre no encontrada"));
-            category.setParentCategory(parentCategory);
-        } else {
-            category.setParentCategory(null);
+        if (!category.getNombre().equals(request.getNombre())
+                && categoryRepository.existsByNombre(request.getNombre())) {
+            throw new IllegalArgumentException("Ya existe una categoría con ese nombre");
         }
 
-        Category updatedCategory = categoryRepository.save(category);
-        return mapToResponse(updatedCategory);
+        category.setNombre(request.getNombre());
+        category.setDescripcion(request.getDescripcion());
+
+        if (request.getCategoriaPadreId() != null) {
+            Category padre = categoryRepository.findById(request.getCategoriaPadreId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Categoría padre no encontrada"));
+            category.setCategoriaPadre(padre);
+        } else {
+            category.setCategoriaPadre(null);
+        }
+
+        return toDTO(categoryRepository.save(category));
     }
 
     @Override
     public void deleteCategory(Long id) {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Categoría no encontrada"));
-        category.setActive(false);
+        category.setActiva(false);
         categoryRepository.save(category);
     }
 
-    private CategoryResponseDTO mapToResponse(Category category) {
+    private CategoryResponseDTO toDTO(Category c) {
         return CategoryResponseDTO.builder()
-                .id(category.getId())
-                .name(category.getName())
-                .description(category.getDescription())
-                .parentCategory(category.getParentCategory() != null ? mapToResponse(category.getParentCategory()) : null)
-                .subcategories(category.getSubcategories() != null ?
-                    category.getSubcategories().stream()
-                        .filter(Category::getActive)
-                        .map(this::mapToResponse)
-                        .collect(Collectors.toList()) : null)
-                .active(category.getActive())
+                .id(c.getId())
+                .nombre(c.getNombre())
+                .descripcion(c.getDescripcion())
+                .activa(c.getActiva())
+                .categoriaPadreId(c.getCategoriaPadre() != null ? c.getCategoriaPadre().getId() : null)
+                .categoriaPadreNombre(c.getCategoriaPadre() != null ? c.getCategoriaPadre().getNombre() : null)
+                .subcategorias(c.getSubcategorias() != null
+                        ? c.getSubcategorias().stream()
+                        .filter(sub -> sub.getActiva())
+                        .map(this::toDTO)
+                        .collect(Collectors.toList())
+                        : null)
                 .build();
     }
 }
