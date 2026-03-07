@@ -1,5 +1,6 @@
 package com.librarysystem.config;
 
+import com.librarysystem.security.JwtAuthFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -8,49 +9,63 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
-// @EnableMethodSecurity activa el uso de @PreAuthorize en los controllers
-// Lo necesitamos para US-004 (solo ADMIN) y US-005 (ADMIN y BIBLIOTECARIO)
 @EnableMethodSecurity
 public class SecurityConfig {
+
+    private final JwtAuthFilter jwtAuthFilter;
+
+    public SecurityConfig(JwtAuthFilter jwtAuthFilter) {
+        this.jwtAuthFilter = jwtAuthFilter;
+    }
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                // Desactivamos CSRF porque usamos JWT (no cookies de sesión)
                 .csrf(csrf -> csrf.disable())
-
-                // Sin estado: cada request lleva su propio token, no hay sesión guardada en servidor
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
 
                 .authorizeHttpRequests(auth -> auth
-                        // Por ahora dejamos TODO permitido mientras desarrollamos US-001/002/003
-                        // Cuando terminemos autenticación, aquí irán las reglas por rol
-                        .anyRequest().permitAll()
-                );
+                        // Endpoints públicos (sin autenticación)
+                        .requestMatchers("/api/v1/auth/**").permitAll()
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                        .requestMatchers("/api/v1/books/catalog/**").permitAll()
+
+                        // Endpoints protegidos requieren autenticación
+                        .anyRequest().authenticated()
+                )
+
+                // Agregar filtro JWT antes del filtro de autenticación
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
-    // BCrypt es el algoritmo que encripta los passwords antes de guardarlos en BD
-    // Se usa en US-001 (registro) y US-002 (login para comparar el password)
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    // AuthenticationManager es el que valida usuario+password en el login
-    // Spring lo necesita como Bean para inyectarlo en AuthServiceImpl
     @Bean
     public AuthenticationManager authenticationManager(
             AuthenticationConfiguration authenticationConfiguration) throws Exception {
         return authenticationConfiguration.getAuthenticationManager();
+    }
+
+    @Bean
+    public UserDetailsService userDetailsService() {
+        return username -> {
+            throw new UsernameNotFoundException("UserDetailsService no implementado - usar JWT");
+        };
     }
 }
